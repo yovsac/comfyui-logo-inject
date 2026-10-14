@@ -1,0 +1,478 @@
+{
+  "2": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "_meta": {
+      "title": "VAELoader"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "CLIPLoader"
+    }
+  },
+  "108": {
+    "class_type": "UnetLoaderGGUF",
+    "inputs": {
+      "unet_name": "QWEN\\qwen-image-edit-2511-Q8_0.gguf"
+    },
+    "_meta": {
+      "title": "UnetLoaderGGUF"
+    }
+  },
+  "18": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "placeholder.jpeg"
+    },
+    "_meta": {
+      "title": "Car image"
+    }
+  },
+  "19": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1.0,
+      "resolution_steps": 1,
+      "image": [
+        "18",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "ImageScaleToTotalPixels"
+    }
+  },
+  "20": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "placeholder.jpeg"
+    },
+    "_meta": {
+      "title": "Logo"
+    }
+  },
+  "300": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "empty.png"
+    },
+    "_meta": {
+      "title": "Badge spots"
+    }
+  },
+  "100:1": {
+    "class_type": "PrimitiveString",
+    "inputs": {
+      "value": "open"
+    },
+    "_meta": {
+      "title": "Badge type"
+    }
+  },
+  "200:21": {
+    "class_type": "Seed (rgthree)",
+    "inputs": {
+      "seed": 7
+    },
+    "_meta": {
+      "title": "Seed"
+    }
+  },
+  "310": {
+    "class_type": "DownloadAndLoadDepthAnythingV3Model",
+    "inputs": {
+      "model": "da3_large.safetensors",
+      "precision": "auto"
+    },
+    "_meta": {
+      "title": "DownloadAndLoadDepthAnythingV3Model"
+    }
+  },
+  "311": {
+    "class_type": "DepthAnything_V3",
+    "inputs": {
+      "da3_model": [
+        "310",
+        0
+      ],
+      "images": [
+        "19",
+        0
+      ],
+      "normalization_mode": "Raw",
+      "resize_method": "resize",
+      "invert_depth": false,
+      "keep_model_size": false
+    },
+    "_meta": {
+      "title": "DepthAnything_V3"
+    }
+  },
+  "40": {
+    "class_type": "SaveImageWebsocket",
+    "inputs": {
+      "images": [
+        "50",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SaveImageWebsocket"
+    }
+  },
+  "45": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "LogoInject/output",
+      "images": [
+        "50",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Save output (disk copy)"
+    }
+  },
+  "99": {
+    "class_type": "AppInfo",
+    "_meta": {
+      "title": "AppInfo"
+    },
+    "inputs": {
+      "name": "Logo Inject",
+      "input_ids": "18,20,100,200,300",
+      "output_ids": "40",
+      "image": [
+        "50",
+        0
+      ],
+      "description": "Car image + logo -> the logo placed at every badge site in perspective, chrome finish.",
+      "version": 1,
+      "share_prefix": "",
+      "link": "https://",
+      "category": "",
+      "auto_save": "enable",
+      "idle_animation": false
+    }
+  },
+  "110": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "lora_name": "qwen\\Logo_Inject_Erase.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "Erase LoRA"
+    }
+  },
+  "111": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "110",
+        0
+      ],
+      "shift": 3.1
+    },
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "112": {
+    "class_type": "CFGNorm",
+    "inputs": {
+      "model": [
+        "111",
+        0
+      ],
+      "strength": 1.0
+    },
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "120": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "lora_name": "qwen\\Logo_Inject_Finish.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "Finish LoRA"
+    }
+  },
+  "121": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "120",
+        0
+      ],
+      "shift": 3.1
+    },
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "122": {
+    "class_type": "CFGNorm",
+    "inputs": {
+      "model": [
+        "121",
+        0
+      ],
+      "strength": 1.0
+    },
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "320": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sam3\\sam3.pt"
+    },
+    "_meta": {
+      "title": "SAM3"
+    }
+  },
+  "321": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "320",
+        1
+      ],
+      "text": "emblem:50"
+    },
+    "_meta": {
+      "title": "SAM3 prompt emblem:50"
+    }
+  },
+  "331": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "320",
+        0
+      ],
+      "image": [
+        "19",
+        0
+      ],
+      "threshold": 0.2,
+      "refine_iterations": 2,
+      "individual_masks": true,
+      "conditioning": [
+        "321",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3 emblem"
+    }
+  },
+  "322": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "320",
+        1
+      ],
+      "text": "badge:50"
+    },
+    "_meta": {
+      "title": "SAM3 prompt badge:50"
+    }
+  },
+  "332": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "320",
+        0
+      ],
+      "image": [
+        "19",
+        0
+      ],
+      "threshold": 0.2,
+      "refine_iterations": 2,
+      "individual_masks": true,
+      "conditioning": [
+        "322",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3 badge"
+    }
+  },
+  "323": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "320",
+        1
+      ],
+      "text": "logo:50"
+    },
+    "_meta": {
+      "title": "SAM3 prompt logo:50"
+    }
+  },
+  "333": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "320",
+        0
+      ],
+      "image": [
+        "19",
+        0
+      ],
+      "threshold": 0.2,
+      "refine_iterations": 2,
+      "individual_masks": true,
+      "conditioning": [
+        "323",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3 logo"
+    }
+  },
+  "324": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "320",
+        1
+      ],
+      "text": "wheel:20"
+    },
+    "_meta": {
+      "title": "SAM3 prompt wheel:20"
+    }
+  },
+  "334": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": [
+        "320",
+        0
+      ],
+      "image": [
+        "19",
+        0
+      ],
+      "threshold": 0.3,
+      "refine_iterations": 2,
+      "individual_masks": true,
+      "conditioning": [
+        "324",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3 wheel"
+    }
+  },
+  "50": {
+    "class_type": "LogoInjectV2",
+    "inputs": {
+      "erase_model": [
+        "112",
+        0
+      ],
+      "finish_model": [
+        "122",
+        0
+      ],
+      "clip": [
+        "3",
+        0
+      ],
+      "vae": [
+        "2",
+        0
+      ],
+      "image": [
+        "18",
+        0
+      ],
+      "logo": [
+        "20",
+        0
+      ],
+      "spots": [
+        "300",
+        0
+      ],
+      "depth": [
+        "311",
+        0
+      ],
+      "intrinsics": [
+        "311",
+        6
+      ],
+      "badge_body": [
+        "100:1",
+        0
+      ],
+      "seed": [
+        "200:21",
+        0
+      ],
+      "emblems": [
+        "331",
+        0
+      ],
+      "emblems_2": [
+        "332",
+        0
+      ],
+      "emblems_3": [
+        "333",
+        0
+      ],
+      "wheels": [
+        "334",
+        0
+      ],
+      "erase_seed": 35,
+      "steps": 25,
+      "cfg": 4.0,
+      "sampler_name": "euler",
+      "scheduler": "beta57",
+      "erase_grow": 0.35,
+      "erase_context": 2.0,
+      "polarity_retry": true,
+      "max_tilt": 35.0
+    },
+    "_meta": {
+      "title": "Logo Inject v2"
+    }
+  }
+}
