@@ -17,6 +17,8 @@ WIDE_LEAN = 0.6  # share of the band's lean a wide logo keeps (calibrated on Yov
 SYM_K = 2.5  # a symbol replacing lettering stands this many letter heights tall (real Audi rings ~2.7x V70 letters)
 HUB_SIGHT = True  # hub pose relative to the line of sight to the hub (round 11)
 HUB_NOLEDGE = True  # hubs ignore the ledge line - an edge inside the cap turned the Honda H (round 12)
+EDGE_THROUGH = True  # lines the old badge sat on are no limit (geom.py round 23)
+MIN_PAINT_FRAC = 0.45  # a badge never shrinks below this share of the painted spot (round 23)
 CAP_FILL = 0.75  # a badge on a blank hub's plain cap fills this share of the cap (round 18)
 CAP_INK = 0.82  # ...and its ink reaches at most this share of the cap radius (round 19)
 RING_CAP_F = 0.88  # ring logo on a cap: its ring onto the cap's rim line, 0.88 of the cap (round 12 ghost ring)
@@ -47,8 +49,14 @@ def logo_parts(logo_rgba):
     return a[y:y + h, x:x + w].astype(np.float32) / 255, body[y:y + h, x:x + w], rgb[y:y + h, x:x + w]
 
 
-def strong_edges(car, exclude, min_len):
-    """Long straight strong edges (light bar, panel gaps, rims) as a binary map; the old emblem's own edges excluded."""
+def strong_edges(car, exclude, min_len, through=None, through_limit=None):
+    """Long straight strong edges (light bar, panel gaps, rims) as a binary map; the old emblem's own edges excluded.
+    through: a line that runs INTO this area (the old badge / the painted spot) is the surface the badge sits on, not
+    a limit (round 23: the green centre line under the DS, the bonnet crease under the Abarth wedge, the grille mesh
+    round the E-3008 shield shrank the new badges to 30 / 17 / 42 px).
+    through_limit (cx, cy, r): a blank painted spot - a line through it still IS a limit when it runs well off the spot's
+    centre (>= 0.4 r) and is a real boundary (step or ridge >= 50 in Lab): the grille bar's edge, the boot lip, the light
+    bar and the plate recess under 2x badges (round 24); weak trim lines and lines through the centre stay under the badge."""
     g = cv2.GaussianBlur(cv2.cvtColor(car, cv2.COLOR_RGB2GRAY), (5, 5), 0)
     e = cv2.Canny(g, 60, 160)
     e[exclude] = 0
@@ -56,8 +64,27 @@ def strong_edges(car, exclude, min_len):
     L = cv2.HoughLinesP(e, 1, np.pi / 360, threshold=max(20, int(min_len * 0.6)), minLineLength=int(min_len), maxLineGap=4)
     if L is not None:
         for x1, y1, x2, y2 in L[:, 0]:
+            if through is not None:
+                seg = np.zeros_like(e); cv2.line(seg, (int(x1), int(y1)), (int(x2), int(y2)), 1, 3)
+                if (seg.astype(bool) & through).any() and not (through_limit is not None and _boundary(car, (x1, y1, x2, y2), through_limit)):
+                    continue
             cv2.line(out, (int(x1), int(y1)), (int(x2), int(y2)), 255, 2)
     return out > 0
+
+
+def _boundary(car, seg, lim, k=6, gate=50.0, off_min=0.4):
+    """Is this segment a panel boundary well off the spot centre? (see strong_edges, round 24)"""
+    x1, y1, x2, y2 = (float(v) for v in seg); cx, cy, r = lim
+    d = np.array([x2 - x1, y2 - y1]); ln = float(np.hypot(*d))
+    if ln < 1 or abs(d[0] * (cy - y1) - d[1] * (cx - x1)) / ln < off_min * r:
+        return False
+    H, W = car.shape[:2]; u = d / ln; nrm = np.array([-u[1], u[0]]); st, ri = [], []
+    for t in np.linspace(0.1, 0.9, 15):
+        p = np.array([x1, y1]) + t * d; pts = [p + s * k * nrm for s in (-1, 0, 1)]
+        if all(0 <= q[0] < W and 0 <= q[1] < H for q in pts):
+            a, m, b = (cv2.cvtColor(car[int(q[1]):int(q[1]) + 1, int(q[0]):int(q[0]) + 1], cv2.COLOR_RGB2LAB)[0, 0].astype(float) for q in pts)
+            st.append(np.linalg.norm(a - b)); ri.append(np.linalg.norm(m - (a + b) / 2))
+    return bool(st) and max(float(np.median(st)), float(np.median(ri))) >= gate
 
 
 def triu(w, h, a):
@@ -610,8 +637,15 @@ def site_geometry(c, j, spot, lw, lh, body, marks=None):
     excl = cv2.dilate(old.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0 if old.sum() else np.zeros_like(spot)
     if on_hub:  # the painted cap/plate is erased anyway: its own rim is no limit (van plates' top edge shrank the badge)
         excl |= spot
+    through = through_lim = None
+    if EDGE_THROUGH and not on_hub and not (strip and old.sum()):  # lettering keeps its edge clamp (Dacia over ASTON MARTIN: the tail-light strip runs into the words)
+        if old.sum():
+            through = cv2.dilate(old.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
+        else:  # no old emblem found: the painted spot is where the badge goes - what crosses it lies under it
+            excl |= spot; through = cv2.dilate(spot.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+            sy_, sx_ = np.nonzero(spot); through_lim = (sx_.mean(), sy_.mean(), max(np.ptp(sx_), np.ptp(sy_)) / 2)
     # clearance: the badge keeps a small gap to every long edge (the Peugeot shield sat ON the light bar's edge)
-    edges = strong_edges(car, excl, max(12, 0.5 * target)); raw_edges = edges
+    edges = strong_edges(car, excl, max(12, 0.5 * target), through, through_lim); raw_edges = edges
     gap = max(2, int(round(0.06 * target)))
     edges = cv2.dilate(edges.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * gap + 1, 2 * gap + 1))) > 0
     # a round old emblem is the best perspective gauge there is: a disc on the panel, seen as this ellipse. The depth
@@ -769,7 +803,8 @@ def site_geometry(c, j, spot, lw, lh, body, marks=None):
             fits = strip or on_hub or max(qw, qh) <= 1.25 * max(obox)  # Citroen oval may be wider than the Y it replaces)
         else:
             fits = strip or on_hub or (qw <= 1.2 * obox[0] and qh <= 1.2 * obox[1])
-        if (hit <= 2 and fits) or target < 0.55 * t0:
+        sy_, sx_ = np.nonzero(spot); floor = MIN_PAINT_FRAC * max(np.ptp(sx_), np.ptp(sy_)) if not (on_hub or strip) else 0
+        if (hit <= 2 and fits) or target < 0.55 * t0 or target * 0.93 < floor:
             break
         target *= 0.93
     if slide:

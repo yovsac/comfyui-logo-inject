@@ -29,7 +29,9 @@ def _bar_crosses(g, hole, d):
     """A long straight near-horizontal (or vertical) edge on the left AND right (top AND bottom) of the hole that line up."""
     ys, xs = np.nonzero(hole); cx, cy = xs.mean(), ys.mean()
     e = cv2.Canny(g.astype(np.uint8), 50, 150); e[cv2.dilate(hole.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0] = 0
-    L = cv2.HoughLinesP(e, 1, np.pi / 360, threshold=int(0.15 * d), minLineLength=int(0.25 * d), maxLineGap=3)
+    # .15d/.10d (round 24): at the bigger r23 crop the t05 chrome bar's left edges came out as 100 px pieces < .25d -> no
+    # pair, no fix, a flat light plate behind the Opel
+    L = cv2.HoughLinesP(e, 1, np.pi / 360, threshold=int(0.10 * d), minLineLength=int(0.15 * d), maxLineGap=3)
     if L is None:
         return [], 0.0
     left, right, slopes = [], [], []

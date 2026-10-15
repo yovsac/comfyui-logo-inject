@@ -129,6 +129,53 @@ def _polarity(fin, body, marks):
     return round(cf - 2 * max(0.0, ff - 80), 1), bool(ff > 110 or cf < -15)
 
 
+def _wall_cut(crop, em_c, covc):
+    """A blank painted spot (no old emblem found) that runs over a long panel edge: the part beyond the edge from the new
+    badge is not erased, and the erase's feathered rim stops there too. The painted circle under the Citroen oval overlapped
+    the plate recess and the erase drew a dark smudge onto the plate's top edge (Yovan's r24 review, 2026-10-14).
+    -> (cut: erase-mask pixels to drop, far: pixels the feathered composite must not reach) or (None, None)"""
+    cov1 = covc > 0.05; emb = em_c > 8
+    g_ = cv2.GaussianBlur(cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY), (5, 5), 0)
+    if not cov1.any():
+        return None, None
+    e_ = cv2.Canny(g_, 60, 160); wall = np.zeros(emb.shape, np.uint8)
+    # gap 10: the plate's top edge steps a row every ~200 px and at gap 4 Hough broke it into pieces under the min length
+    L_ = cv2.HoughLinesP(e_, 1, np.pi / 360, threshold=40, minLineLength=int(0.12 * SIDE), maxLineGap=10)
+    # a panel edge runs past the erase on both ends; a straight stroke of an old emblem SAM missed (the Peugeot shield's
+    # top edge on the E-3008, the DS 'D' upright) ends inside it and stayed un-erased as a bright line (r24c review)
+    # 8 px, not a share of the erase: the E-3008 plate edge fades at the plate's rounded corner just past the erase rim
+    out_ = cv2.dilate(emb.astype(np.uint8), np.ones((17, 17), np.uint8)) == 0
+    # Hough splits one edge into collinear pieces (rc7's plate edge: left half + right half, each ending inside the
+    # erase), so chain pieces on the same line (angle < 1 deg, offset < 4 px, gap < 30 px) before the both-ends test
+    segs = []
+    for x1, y1, x2, y2 in (L_[:, 0].astype(float) if L_ is not None else []):
+        th = np.arctan2(y2 - y1, x2 - x1) % np.pi; d_ = np.array([np.cos(th), np.sin(th)])
+        rho = -d_[1] * x1 + d_[0] * y1; t1, t2 = sorted((d_ @ (x1, y1), d_ @ (x2, y2)))
+        for s in segs:
+            dth = abs(s[0] - th); dth = min(dth, np.pi - dth)
+            if dth < np.pi / 180 and abs(s[1] - rho) < 4 and t1 <= s[3] + 30 and t2 >= s[2] - 30:
+                s[2], s[3] = min(s[2], t1), max(s[3], t2); break
+        else:
+            segs.append([th, rho, t1, t2])
+    for th, rho, t1, t2 in segs:
+        d_ = np.array([np.cos(th), np.sin(th)]); n_ = np.array([-d_[1], d_[0]])
+        p1, p2 = d_ * t1 + n_ * rho, d_ * t2 + n_ * rho
+        if all(out_[int(np.clip(p[1], 0, emb.shape[0] - 1)), int(np.clip(p[0], 0, emb.shape[1] - 1))] for p in (p1, p2)):
+            cv2.line(wall, (int(p1[0]), int(p1[1])), (int(p2[0]), int(p2[1])), 1, 5)
+    wall = wall > 0
+    wall &= ~cov1
+
+    def beyond(region):
+        n_, lab_ = cv2.connectedComponents((region & ~wall).astype(np.uint8))
+        own = np.unique(lab_[cov1 & region]); own = own[own > 0]
+        return region & ~np.isin(lab_, own) & ~cov1
+    cut = beyond(emb)
+    if not cut.any():
+        return None, None
+    far = beyond(cv2.dilate(emb.astype(np.uint8), np.ones((25, 25), np.uint8)) > 0) | (wall & ~cov1 & cv2.dilate(cut.astype(np.uint8), np.ones((25, 25), np.uint8)).astype(bool))
+    return cut, far
+
+
 def _halo(fin, erased, body, fm):
     """Solid badges: share of the band just outside the body (5-11 px, inside the finish mask) that the finish made
     >25 levels lighter than the erased panel - a glow or lobe past the rim. The body is first moved onto the finish's
@@ -212,6 +259,8 @@ class LogoInjectV2:
                 er = cv2.resize(er, (s2, s2), interpolation=cv2.INTER_LANCZOS4)[Y0 - B0:Y0 - B0 + side, X0 - A0:X0 - A0 + side]
                 er = cv2.resize(er, (SIDE, SIDE), interpolation=cv2.INTER_LANCZOS4)
             m = cv2.GaussianBlur(cv2.dilate(em_c, np.ones((9, 9), np.uint8)).astype(np.float32), (0, 0), 3)[..., None] / 255
+            if jb.get("far") is not None:
+                m = m * (1 - jb["far"][..., None])
         return (crop * (1 - m) + er * m).astype(np.uint8).astype(np.float32)
 
     def _finish(self, model, jb, sd):
@@ -305,7 +354,12 @@ class LogoInjectV2:
                     cv = np.zeros((2 * SIDE, 2 * SIDE), np.uint8); cv2.fillPoly(cv, [np.round(pp).astype(np.int32)], 255)
                     bwc = np.maximum(cv2.resize(cv.astype(np.float32) / 255, (SIDE, SIDE), interpolation=cv2.INTER_AREA), mwc); sol = True
             placement = placement * (1 - mw[..., None]) + np.array([40, 120, 255], np.float32) * mw[..., None]
-            jobs.append(dict(j=j, geo=geo, X0=X0, Y0=Y0, side=side, k=k, crop=crop, em=em, em_c=cr(em, cv2.INTER_LINEAR),
+            em_c, far = cr(em, cv2.INTER_LINEAR), None
+            if geo.get("site") == "spot" and not geo.get("hub"):
+                cut, far = _wall_cut(crop, em_c, np.maximum(mwc, bwc if sol else 0))
+                if cut is not None:
+                    em_c = em_c.copy(); em_c[cut] = 0; far = far.astype(np.float32); geo["erase_wall_cut"] = int(cut.sum())
+            jobs.append(dict(j=j, geo=geo, X0=X0, Y0=Y0, side=side, k=k, crop=crop, em=em, em_c=em_c, far=far,
                              mwc=mwc, bwc=bwc, solid=sol, cap_ell=cap_ell, keep_cap=bool(blank_cap and geo["cap_plain"][0]),
                              light=bool(solid and _light_field(bwc, mwc))))
         # 1) every erase (erase LoRA patched once)

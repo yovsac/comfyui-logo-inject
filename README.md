@@ -7,7 +7,7 @@ badge onto a car render at the spots the user paints. It erases the old emblem, 
 perspective, gives it a real badge finish, and keeps the original pixels everywhere else.
 
 - Main node: **`LogoInjectV2`** (category `Logo Inject`). This is the only node the Logo Inject tool uses.
-- October 2026 release = git tag **`v2.0.0`**.
+- October 2026 release = git tag **`v2.0.0`**. Latest: **`v2.0.1`** (see Changes below).
 - Nothing downloads at runtime. The node makes no network calls.
 
 ## Install
@@ -81,7 +81,12 @@ are not part of this repo: installing the node pack doesn't need them.
 - The node returns `image` (the result), `placement` (a debug view) and `report` (text).
 - Defaults: 25 steps, cfg 4.0, `euler` / `beta57`, erase seed 35.
 
-## Known limits (v2.0.0)
+## Changes
+
+- **v2.0.1:** badges no longer shrink against lines they sit on (at least 0.45 of the painted spot), and the erase
+  keeps plate edges and chrome bars. Fixes tiny badges and smeared plates. Same inputs and workflow as v2.0.0.
+
+## Known limits (v2.0.1)
 
 - A logo can be hard to see when it has the same tone as the surface under it, e.g. a silver logo on a silver
   wheel cap.
