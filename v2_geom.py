@@ -63,7 +63,7 @@ def strong_edges(car, exclude, min_len, through=None, through_limit=None):
     out = np.zeros_like(e)
     L = cv2.HoughLinesP(e, 1, np.pi / 360, threshold=max(20, int(min_len * 0.6)), minLineLength=int(min_len), maxLineGap=4)
     if L is not None:
-        for x1, y1, x2, y2 in L[:, 0]:
+        for x1, y1, x2, y2 in L.reshape(-1, 4):  # OpenCV 5 returns (N, 4), 4.x (N, 1, 4)
             if through is not None:
                 seg = np.zeros_like(e); cv2.line(seg, (int(x1), int(y1)), (int(x2), int(y2)), 1, 3)
                 if (seg.astype(bool) & through).any() and not (through_limit is not None and _boundary(car, (x1, y1, x2, y2), through_limit)):

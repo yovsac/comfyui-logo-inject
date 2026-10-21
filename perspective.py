@@ -134,7 +134,7 @@ def edge_angle(img, center_px, half, max_deg=40.0):
     if L is None:
         return None
     ang, w = [], []
-    for x1, y1, x2, y2 in L[:, 0]:
+    for x1, y1, x2, y2 in L.reshape(-1, 4):  # OpenCV 5 returns (N, 4), 4.x (N, 1, 4)
         a = np.degrees(np.arctan2(y2 - y1, x2 - x1))
         a = (a + 90) % 180 - 90
         if abs(a) <= max_deg:

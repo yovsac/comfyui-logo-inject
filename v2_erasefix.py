@@ -35,7 +35,7 @@ def _bar_crosses(g, hole, d):
     if L is None:
         return [], 0.0
     left, right, slopes = [], [], []
-    for x1, y1, x2, y2 in L[:, 0]:
+    for x1, y1, x2, y2 in L.reshape(-1, 4):  # OpenCV 5 returns (N, 4), 4.x (N, 1, 4)
         if abs(y2 - y1) > 0.12 * abs(x2 - x1) + 1:
             continue
         yc = y1 + (y2 - y1) * (cx - x1) / ((x2 - x1) or 1)  # height where it would cross the hole centre
