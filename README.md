@@ -7,7 +7,7 @@ badge onto a car render at the spots the user paints. It erases the old emblem, 
 perspective, gives it a real badge finish, and keeps the original pixels everywhere else.
 
 - Main node: **`LogoInjectV2`** (category `Logo Inject`). This is the only node the Logo Inject tool uses.
-- October 2026 release = git tag **`v2.0.0`**. Latest: **`v2.0.2`** (see Changes below).
+- October 2026 release = git tag **`v2.0.0`**. Latest: **`v2.0.3`** (see Changes below).
 - Nothing downloads at runtime. The node makes no network calls.
 
 ## Install
@@ -83,12 +83,14 @@ are not part of this repo: installing the node pack doesn't need them.
 
 ## Changes
 
+- **v2.0.3:** the last `cv2.HoughLinesP` reader fixed for OpenCV 5 (fixes "cannot unpack non-iterable
+  numpy.float64 object"). Same inputs and workflow as v2.0.1.
 - **v2.0.2:** works with OpenCV 5 (`cv2.HoughLinesP` now returns (N, 4); fixes "cannot unpack non-iterable
   numpy.int32 object"). Same inputs and workflow as v2.0.1.
 - **v2.0.1:** badges no longer shrink against lines they sit on (at least 0.45 of the painted spot), and the erase
   keeps plate edges and chrome bars. Fixes tiny badges and smeared plates. Same inputs and workflow as v2.0.0.
 
-## Known limits (v2.0.2)
+## Known limits (v2.0.3)
 
 - A logo can be hard to see when it has the same tone as the surface under it, e.g. a silver logo on a silver
   wheel cap.

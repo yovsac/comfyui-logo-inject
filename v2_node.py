@@ -148,7 +148,7 @@ def _wall_cut(crop, em_c, covc):
     # Hough splits one edge into collinear pieces (rc7's plate edge: left half + right half, each ending inside the
     # erase), so chain pieces on the same line (angle < 1 deg, offset < 4 px, gap < 30 px) before the both-ends test
     segs = []
-    for x1, y1, x2, y2 in (L_[:, 0].astype(float) if L_ is not None else []):
+    for x1, y1, x2, y2 in (L_.reshape(-1, 4).astype(float) if L_ is not None else []):  # OpenCV 5 returns (N, 4), 4.x (N, 1, 4)
         th = np.arctan2(y2 - y1, x2 - x1) % np.pi; d_ = np.array([np.cos(th), np.sin(th)])
         rho = -d_[1] * x1 + d_[0] * y1; t1, t2 = sorted((d_ @ (x1, y1), d_ @ (x2, y2)))
         for s in segs:
